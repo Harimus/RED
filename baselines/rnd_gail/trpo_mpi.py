@@ -19,6 +19,63 @@ from baselines.common.cg import cg
 from baselines.gail.statistics import stats
 from baselines.common.dataset_plus import iterbatches
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def lineplot(x, y, y2=None, filename='', xaxis='Steps', yaxis='Return', title=''):
+  y = np.array(y).squeeze()                                                              
+  y_mean, y_std = y.mean(axis=1), y.std(axis=1)                                 
+  sns.lineplot(x=x, y=y_mean, color='coral')                                    
+  plt.fill_between(x, y_mean - y_std, y_mean + y_std, color='coral', alpha=0.3) 
+  if y2:                                                                        
+    y2 = np.array(y2).squeeze()                                                      
+    y2_mean, y2_std = y2.mean(axis=1), y2.std(axis=1)                           
+    sns.lineplot(x=x, y=y2_mean, color='b')                                     
+    plt.fill_between(x, y2_mean - y2_std, y2_mean + y2_std, color='b', alpha=0.3)
+                                                                                
+  plt.xlim(left=0, right=x[-1])                                                 
+  plt.xlabel(xaxis)                                                             
+  plt.ylabel(yaxis)                                                             
+  plt.title(title)                                                              
+  plt.savefig(f'{filename}.png')                                                
+  plt.close()          
+
+def evaluate_policy(metrics, step, pi, env, reward_giver, expert_dataset, dir, num_episodes=30):
+  exp_data_size = expert_dataset[0].shape[0]
+  ob = env.reset()
+  i, ep_lens,  episode_rewards, episode_pred_rewards, episode_exp_pred_rewards = 0,[], [], [], []
+  for i in range(num_episodes):
+    sum_reward, pred_reward, pred_exp_reward = 0, 0, 0
+    j = 0
+    done = False
+    print(f"Evaluatng agent... {i}")
+    while not done:
+      ac, _ = pi.act(False, ob)
+      ob, rew, done, _ = env.step(ac)
+      pred_rew = reward_giver.get_reward(ob, ac)
+      rndi = np.random.randint(exp_data_size)
+      pred_exp_reward += reward_giver.get_reward(expert_dataset[0][rndi], expert_dataset[1][rndi])
+      sum_reward+=rew
+      pred_reward += pred_rew
+      j+=1
+    episode_rewards.append(sum_reward)
+    episode_pred_rewards.append(pred_reward)
+    episode_exp_pred_rewards.append(pred_exp_reward)
+    ep_lens.append(j)
+    ob = env.reset()
+  metrics['test_step'].append(step)
+  metrics['test_returns'].append(episode_rewards)
+  metrics['policy_reward'].append(episode_pred_rewards)
+  metrics['expert_reward'].append(episode_exp_pred_rewards)
+  tstfn = os.path.join(dir, 'test_return')
+  predfn = os.path.join(dir, 'predicted_return')
+  if len(metrics['test_step']) > 1:
+    lineplot(metrics['test_step'], metrics['test_returns'], filename=tstfn, title='Returns')
+    lineplot(metrics['test_step'], metrics['policy_reward'], metrics['expert_reward'], filename=predfn, title='predicted rewards')
+
+
+
+
 
 def traj_segment_generator(pi, env, reward_giver, horizon, stochastic):
 
@@ -215,6 +272,7 @@ def learn(env, policy_func, reward_giver, expert_dataset, rank,
     best = -2000
     save_ind = 0
     max_save = 3
+    metrics = dict(test_step=[], test_returns=[], policy_reward=[], expert_reward=[])
     while True:
         if callback: callback(locals(), globals())
         if max_timesteps and timesteps_so_far >= max_timesteps:
@@ -334,6 +392,7 @@ def learn(env, policy_func, reward_giver, expert_dataset, rank,
         logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
         if rank == 0:
             logger.dump_tabular()
+            evaluate_policy(metrics, timesteps_so_far, pi, env, reward_giver, expert_dataset, ckpt_dir)
 
 
 def flatten_lists(listoflists):

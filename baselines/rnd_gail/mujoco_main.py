@@ -36,6 +36,8 @@ D4RL_MAP['Hopper-v2']='hopper-expert-v2'
 def get_d4rl_exp_data(env_name, subsample=None):
     env = gym.make(env_name)
     data = env.get_dataset()
+    if subsample: # 250 should fit it to the size of RED data
+      return [data["observations"][::subsample], data["actions"][::subsample]]
     return [data["observations"], data["actions"]]
 
 def get_exp_data(expert_path):
@@ -47,6 +49,7 @@ def get_exp_data(expert_path):
 
         # print(data["observations"].shape)
         # print(data["actions"].shape)
+        import pdb; pdb.set_trace()
         return [data["observations"], data["actions"]]
 
 
