@@ -11,6 +11,9 @@ from tqdm import tqdm
 import numpy as np
 import gym
 
+import d4rl
+from collection import defaultdict
+
 from baselines.rnd_gail import mlp_policy
 from baselines.common import set_global_seeds, tf_util as U
 from baselines.common.misc_util import boolean_flag
@@ -19,6 +22,19 @@ from baselines import logger
 from baselines.rnd_gail.merged_critic import make_critic
 
 import pickle
+
+class keydefaultdict(defaultdict):
+    def __missing__(self, key):
+        return self.default_factory(key)
+
+D4RL_MAP = keydefaultdict(lambda key: key, 
+        HalfCheetah-v2='halfcheetah-expert-v2', Walker2d-v2='walker2d-expert-v2', 
+        Ant-v2='ant-expert-v2', Hopper-v2='hopper-expert-v2')
+
+def get_d4rl_exp_data(env_name, subsample=None):
+    env = gym.make(env_name)
+    data = env.get_dataset()
+    return [data["observations"], data["actions"]]
 
 def get_exp_data(expert_path):
     with open(expert_path, 'rb') as f:
@@ -38,6 +54,7 @@ Checkpoint_dir = osp.expanduser("~/workspace/checkpoint/mujoco")
 
 def argsparser():
     parser = argparse.ArgumentParser("Tensorflow Implementation of GAIL")
+    parser.add_argument('--use-d4rl', help='use d4rl dataset ID', action='store_true', default=False)
     parser.add_argument('--env_id', help='environment ID', default="Hopper-v2")
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--checkpoint_dir', help='the directory to save model', default=Checkpoint_dir)
@@ -103,6 +120,8 @@ def modify_args(args):
             args.pretrained = True
             args.BC_max_iter = 10
             args.fixed_var = False
+        if args.use_d4rl:
+            args.env_id = D4RL_MAP[args.env_id]
         return args, rnd_iter, dyn_norm
     else:
         if args.env_id == "Hopper-v2":
@@ -122,11 +141,14 @@ def modify_args(args):
         if args.env_id == "Ant-v2":
             args.gamma = 0.99
             dyn_norm = False
+        if args.use_d4rl:
+            args.env_id = D4RL_MAP[args.env_id]
 
         return args, 0, dyn_norm
 
 
 def main(args):
+    args, rnd_iter, dyn_norm = modify_args(args)
     set_global_seeds(args.seed)
     env = gym.make(args.env_id)
     env.seed(args.seed)
@@ -144,7 +166,6 @@ def main(args):
         log_dir = Log_dir
         save_dir = Checkpoint_dir
 
-    args, rnd_iter, dyn_norm = modify_args(args)
     def policy_fn(name, ob_space, ac_space,):
         return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                                     hid_size=args.policy_hidden_size, num_hid_layers=2, popart=args.popart, gaussian_fixed_var=args.fixed_var)
@@ -159,22 +180,22 @@ def main(args):
                 critic = make_critic(env, exp_data, reward_type=args.reward, scale=2500)
             elif args.env_id == "Reacher-v2":
                     critic = make_critic(env, exp_data, rnd_hid_size=20, hid_size=20, reward_type=args.reward, scale=2500)
-            elif args.env_id == "HalfCheetah-v2":
+            elif args.env_id == D4RL_MAP["HalfCheetah-v2"]:
                 critic = make_critic(env, exp_data, rnd_hid_size=20, hid_size=20, reward_type=args.reward, scale=25000)
-            elif args.env_id == "Ant-v2":
+            elif args.env_id == "D4RL_MAP[Ant-v2"]:
                 critic = make_critic(env, exp_data, reward_type=args.reward)
             else:
                 critic = make_critic(env, exp_data, reward_type=args.reward)
         else:
             if args.env_id == "Reacher-v2":
                 critic = make_critic(env, exp_data, hid_size=100, reward_type=args.reward, scale=1000)
-            if args.env_id == "Walker2d-v2":
+            if args.env_id == D4RL_MAP["Walker2d-v2"]:
                 critic = make_critic(env, exp_data, hid_size=30, reward_type=args.reward, scale=100)
-            if args.env_id == "HalfCheetah-v2":
+            if args.env_id == D4RL_MAP["HalfCheetah-v2"]:
                 critic = make_critic(env, exp_data, hid_size=30, reward_type=args.reward, scale=1000)
-            if args.env_id == "Hopper-v2":
+            if args.env_id == D4RL_MAP["Hopper-v2"]:
                 critic = make_critic(env, exp_data, hid_size=30, reward_type=args.reward, scale=1000)
-            if args.env_id == "Ant-v2":
+            if args.env_id == D4RL_MAP["Ant-v2"]:
                 critic = make_critic(env, exp_data, hid_size=128, reward_type=args.reward, scale=100)
 
 

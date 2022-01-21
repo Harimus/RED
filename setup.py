@@ -40,7 +40,8 @@ setup(name='baselines',
           'progressbar2',
           'cloudpickle',
           'click',
-          'opencv-python'
+          'opencv-python',
+          'd4rl @ git+https://github.com/rail-berkeley/d4rl@master#egg=d4rl'
       ],
       extras_require=extras,
       description='OpenAI baselines: high quality implementations of reinforcement learning algorithms',
