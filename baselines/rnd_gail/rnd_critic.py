@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tqdm import tqdm
 from baselines.common import tf_util as U
 from baselines.common.dataset import iterbatches
 from baselines import logger
@@ -69,7 +70,7 @@ class RND_Critic(object):
 
     def train(self, ob, ac, batch_size=32, lr=0.001, iter=200):
         logger.info("Training RND Critic")
-        for _ in range(iter):
+        for _ in tqdm(range(iter), leave=False):
             for data in iterbatches([ob, ac], batch_size=batch_size, include_final_partial_batch=True):
                 self._train(*data, lr)
 

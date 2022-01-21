@@ -14,7 +14,7 @@ def simple_test(env_fn, learn_fn, min_reward_fraction, n_trials=N_TRIALS):
     np.random.seed(0)
     env = DummyVecEnv([seeded_env_fn])
     with tf.Graph().as_default(), tf.Session(config=tf.ConfigProto(allow_soft_placement=True)).as_default():
-        tf.set_random_seed(0)
+        tf.random.set_seed(0)
         model = learn_fn(env)
         sum_rew = 0
         done = True

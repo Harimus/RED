@@ -12,7 +12,7 @@ import numpy as np
 import gym
 
 import d4rl
-from collection import defaultdict
+from collections import defaultdict
 
 from baselines.rnd_gail import mlp_policy
 from baselines.common import set_global_seeds, tf_util as U
@@ -27,9 +27,11 @@ class keydefaultdict(defaultdict):
     def __missing__(self, key):
         return self.default_factory(key)
 
-D4RL_MAP = keydefaultdict(lambda key: key, 
-        HalfCheetah-v2='halfcheetah-expert-v2', Walker2d-v2='walker2d-expert-v2', 
-        Ant-v2='ant-expert-v2', Hopper-v2='hopper-expert-v2')
+D4RL_MAP = keydefaultdict(lambda key: key)
+D4RL_MAP['HalfCheetah-v2']='halfcheetah-expert-v2'
+D4RL_MAP['Walker2d-v2']='walker2d-expert-v2' 
+D4RL_MAP['Ant-v2']='ant-expert-v2'
+D4RL_MAP['Hopper-v2']='hopper-expert-v2'
 
 def get_d4rl_exp_data(env_name, subsample=None):
     env = gym.make(env_name)
@@ -171,7 +173,10 @@ def main(args):
                                     hid_size=args.policy_hidden_size, num_hid_layers=2, popart=args.popart, gaussian_fixed_var=args.fixed_var)
 
     if args.task == 'train':
-        exp_data = get_exp_data(osp.join(osp.dirname(osp.realpath(__file__)), "../../data/%s.pkl" % args.env_id))
+        if args.use_d4rl:
+          exp_data = get_d4rl_exp_data(args.env_id)
+        else:
+          exp_data = get_exp_data(osp.join(osp.dirname(osp.realpath(__file__)), "../../data/%s.pkl" % args.env_id))
 
         task_name = get_task_name(args)
         logger.configure(dir=log_dir, log_suffix=task_name, format_strs=["log", "stdout"])
@@ -182,7 +187,7 @@ def main(args):
                     critic = make_critic(env, exp_data, rnd_hid_size=20, hid_size=20, reward_type=args.reward, scale=2500)
             elif args.env_id == D4RL_MAP["HalfCheetah-v2"]:
                 critic = make_critic(env, exp_data, rnd_hid_size=20, hid_size=20, reward_type=args.reward, scale=25000)
-            elif args.env_id == "D4RL_MAP[Ant-v2"]:
+            elif args.env_id == D4RL_MAP["Ant-v2"]:
                 critic = make_critic(env, exp_data, reward_type=args.reward)
             else:
                 critic = make_critic(env, exp_data, reward_type=args.reward)
