@@ -45,18 +45,17 @@ def evaluate_policy(metrics, step, pi, env, reward_giver, expert_dataset, dir, n
   ob = env.reset()
   i, ep_lens,  episode_rewards, episode_pred_rewards, episode_exp_pred_rewards = 0,[], [], [], []
   for i in range(num_episodes):
-    sum_reward, pred_reward, pred_exp_reward = 0, 0, 0
+    sum_reward, pred_reward, pred_exp_reward = 0, [] ,[]
     j = 0
     done = False
     print(f"Evaluatng agent... {i}")
     while not done:
       ac, _ = pi.act(False, ob)
       ob, rew, done, _ = env.step(ac)
-      pred_rew = reward_giver.get_reward(ob, ac)
+      pred_reward.append(reward_giver.get_reward(ob, ac))
       rndi = np.random.randint(exp_data_size)
-      pred_exp_reward += reward_giver.get_reward(expert_dataset[0][rndi], expert_dataset[1][rndi])
+      pred_exp_reward.append(reward_giver.get_reward(expert_dataset[0][rndi], expert_dataset[1][rndi]))
       sum_reward+=rew
-      pred_reward += pred_rew
       j+=1
     episode_rewards.append(sum_reward)
     episode_pred_rewards.append(pred_reward)
