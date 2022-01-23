@@ -43,29 +43,28 @@ def lineplot(x, y, y2=None, filename='', xaxis='Steps', yaxis='Return', title=''
 def evaluate_policy(metrics, step, pi, env, reward_giver, expert_dataset, dir, num_episodes=30):
   exp_data_size = expert_dataset[0].shape[0]
   ob = env.reset()
-  i, ep_lens,  episode_rewards, episode_pred_rewards, episode_exp_pred_rewards = 0,[], [], [], []
+  i, ep_lens,  episode_rewards,  = 0,[], []
+  j, num_pred_compare, pred_reward, pred_exp_reward = 0, 300, [], []
   for i in range(num_episodes):
-    sum_reward, pred_reward, pred_exp_reward = 0, [] ,[]
-    j = 0
+    sum_reward = 0
     done = False
     print(f"Evaluatng agent... {i}")
     while not done:
       ac, _ = pi.act(False, ob)
       ob, rew, done, _ = env.step(ac)
-      pred_reward.append(reward_giver.get_reward(ob, ac))
       rndi = np.random.randint(exp_data_size)
-      pred_exp_reward.append(reward_giver.get_reward(expert_dataset[0][rndi], expert_dataset[1][rndi]))
+      if j < num_pred_compare:
+        pred_reward.append(reward_giver.get_reward(ob, ac))
+        pred_exp_reward.append(reward_giver.get_reward(expert_dataset[0][rndi], expert_dataset[1][rndi]))
       sum_reward+=rew
       j+=1
     episode_rewards.append(sum_reward)
-    episode_pred_rewards.append(pred_reward)
-    episode_exp_pred_rewards.append(pred_exp_reward)
     ep_lens.append(j)
     ob = env.reset()
   metrics['test_step'].append(step)
   metrics['test_returns'].append(episode_rewards)
-  metrics['policy_reward'].append(episode_pred_rewards)
-  metrics['expert_reward'].append(episode_exp_pred_rewards)
+  metrics['policy_reward'].append(pred_reward)
+  metrics['expert_reward'].append(pred_exp_reward)
   tstfn = os.path.join(dir, 'test_return')
   predfn = os.path.join(dir, 'predicted_return')
   if len(metrics['test_step']) > 1:
