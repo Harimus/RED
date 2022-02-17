@@ -40,11 +40,13 @@ def lineplot(x, y, y2=None, filename='', xaxis='Steps', yaxis='Return', title=''
   plt.savefig(f'{filename}.png')                                                
   plt.close()          
 
-def evaluate_policy(metrics, step, pi, env, reward_giver, expert_dataset, dir, num_episodes=30):
+def evaluate_policy(metrics, step, pi, env, reward_giver, expert_dataset, dir, num_episodes=20):
   exp_data_size = expert_dataset[0].shape[0]
   ob = env.reset()
   i, ep_lens,  episode_rewards,  = 0,[], []
-  j, num_pred_compare, pred_reward, pred_exp_reward = 0, 300, [], []
+  j, num_pred_compare, pred_reward, pred_exp_reward = 0, 500, [], []
+  first = True
+  first_trajectory_policy_reward, first_trajectory_expert_reward = []
   for i in range(num_episodes):
     sum_reward = 0
     done = False
@@ -53,11 +55,14 @@ def evaluate_policy(metrics, step, pi, env, reward_giver, expert_dataset, dir, n
       ac, _ = pi.act(False, ob)
       ob, rew, done, _ = env.step(ac)
       rndi = np.random.randint(exp_data_size)
+      red_reward = reward_giver.get_reward(ob, ac)
       if j < num_pred_compare:
-        pred_reward.append(reward_giver.get_reward(ob, ac))
+        pred_reward.append(red_reward)
         pred_exp_reward.append(reward_giver.get_reward(expert_dataset[0][rndi], expert_dataset[1][rndi]))
       sum_reward+=rew
       j+=1
+      if first: first_trajectory_policy_reward.append(red_reward)
+    first = False
     episode_rewards.append(sum_reward)
     ep_lens.append(j)
     ob = env.reset()
@@ -70,6 +75,17 @@ def evaluate_policy(metrics, step, pi, env, reward_giver, expert_dataset, dir, n
   if len(metrics['test_step']) > 1:
     lineplot(metrics['test_step'], metrics['test_returns'], filename=tstfn, title='Returns')
     lineplot(metrics['test_step'], metrics['policy_reward'], metrics['expert_reward'], filename=predfn, title='predicted rewards')
+  traj_len = len(first_trajectory_policy_reward)
+  indx = min(rndi, len(expert_dataset[0])- traj_len)
+  first_trajectory_expert_reward = reward_giver.get_reward(expert_dataset[0][indx:indx+traj_len], expert_dataset[1][indx:indx+traj_len])
+  fig, ax1, ax2  = plt.subplots(2)
+  ax1.bar([*range(len(first_trajectory_policy_reward))], first_trajectory_policy_reward)
+  ax1.set_title('Policy trajectory reward')
+  ax2.bar([*range(len(first_trajectory_expert_reward))], first_trajectory_expert_reward)
+  ax2.set_title('Expert (sampled) same length trajectory reward')
+  fig.savefig(f"Trajectory_Rewards{step}.png")
+  plt.close(fig)
+
 
 
 
@@ -271,6 +287,7 @@ def learn(env, policy_func, reward_giver, expert_dataset, rank,
     save_ind = 0
     max_save = 3
     metrics = dict(test_step=[], test_returns=[], policy_reward=[], expert_reward=[])
+    eval_count = 0
     while True:
         if callback: callback(locals(), globals())
         if max_timesteps and timesteps_so_far >= max_timesteps:
@@ -390,7 +407,9 @@ def learn(env, policy_func, reward_giver, expert_dataset, rank,
         logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
         if rank == 0:
             logger.dump_tabular()
-            evaluate_policy(metrics, timesteps_so_far, pi, env, reward_giver, expert_dataset, ckpt_dir)
+            if timesteps_so_far > eval_count *(int(max_timesteps/100)):
+              evaluate_policy(metrics, timesteps_so_far, pi, env, reward_giver, expert_dataset, ckpt_dir)
+              eval_count  += 1
 
 
 def flatten_lists(listoflists):
